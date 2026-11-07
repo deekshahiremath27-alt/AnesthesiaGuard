@@ -1,0 +1,70 @@
+from flask import Flask, render_template, request, jsonify
+import json
+from pathlib import Path
+
+app = Flask(__name__)
+
+DATA_FILE = Path(__file__).parent / "sample_patients.json"
+
+
+def load_patients():
+    with open(DATA_FILE, "r") as file:
+        return json.load(file)
+
+
+@app.route("/")
+def home():
+    return render_template(
+        "index.html",
+        patients=load_patients()
+    )
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze_patient():
+
+    data = request.get_json()
+    patient_id = data.get("patient_id")
+
+    patients = load_patients()
+
+    patient = next(
+        (p for p in patients if p["id"] == patient_id),
+        None
+    )
+
+    if not patient:
+        return jsonify({"error": "Patient not found"}), 404
+
+    alerts = []
+
+    if patient["allergies"]:
+        alerts.append({
+            "type": "ALLERGY ALERT",
+            "details": patient["allergies"]
+        })
+
+    if patient["previous_anesthesia_complications"]:
+        alerts.append({
+            "type": "PREVIOUS COMPLICATIONS",
+            "details": patient["previous_anesthesia_complications"]
+        })
+
+    if patient["medications"]:
+        alerts.append({
+            "type": "MEDICATION REVIEW",
+            "details": patient["medications"]
+        })
+
+    summary = {
+        "patient_name": patient["name"],
+        "age": patient["age"],
+        "procedure": patient["planned_procedure"],
+        "alerts": alerts
+    }
+
+    return jsonify(summary)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
